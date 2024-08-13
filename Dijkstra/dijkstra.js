@@ -6,46 +6,65 @@ const graph = {
     E: { A: 2, C: 3, F: 1 },
     F: { B: 3, E: 1 },
     G: { B: 1, C: 2, D: 1 }
-  };
-  
-  function dijkstra(graph, startNode) {
+};
+
+const names = {
+    A: 'woot@alumchat.lol',
+    B: 'bar@alumchat.lol',
+    C: 'foo@alumchat.lol',
+    D: 'omg@alumchat.lol',
+    E: 'lol@alumchat.lol',
+    F: 'swag@alumchat.lol',
+    G: 'yeet@alumchat.lol'
+};
+
+function getUserForNode(node) {
+    return names[node];
+};
+
+function dijkstra(graph, startNode) {
     const distances = {};
     const previous = {};
     const nodes = new Set(Object.keys(graph));
-  
+    
     // Inicializar distancias
     nodes.forEach(node => {
-      distances[node] = node === startNode ? 0 : Infinity;
-      previous[node] = null;
+        distances[node] = node === startNode ? 0 : Infinity;
+        previous[node] = null;
     });
-  
+    
     while (nodes.size > 0) {
-      // Seleccionar el nodo más cercano
-      let closestNode = null;
-      nodes.forEach(node => {
-        if (!closestNode || distances[node] < distances[closestNode]) {
-          closestNode = node;
+        // Seleccionar el nodo más cercano
+        let closestNode = null;
+        nodes.forEach(node => {
+            if (!closestNode || distances[node] < distances[closestNode]) {
+                closestNode = node;
+            }
+        });
+        
+        // Marcar el nodo como visitado
+        nodes.delete(closestNode);
+        
+        // Actualizar distancias a los vecinos
+        for (let neighbor in graph[closestNode]) {
+            const newDist = distances[closestNode] + graph[closestNode][neighbor];
+            if (newDist < distances[neighbor]) {
+                distances[neighbor] = newDist;
+                previous[neighbor] = closestNode;
+            }
         }
-      });
-  
-      // Marcar el nodo como visitado
-      nodes.delete(closestNode);
-  
-      // Actualizar distancias a los vecinos
-      for (let neighbor in graph[closestNode]) {
-        const newDist = distances[closestNode] + graph[closestNode][neighbor];
-        if (newDist < distances[neighbor]) {
-          distances[neighbor] = newDist;
-          previous[neighbor] = closestNode;
-        }
-      }
     }
-  
     return { distances, previous };
-  }
-  
-  // Ejemplo de uso
-  const startNode = 'A';
-  const result = dijkstra(graph, startNode);
-  console.log('Distancias:', result.distances);
-  console.log('Caminos anteriores:', result.previous);
+};
+
+// Ejemplo de uso
+const startNode = 'A';
+const targetNode = 'C';
+const userEmisor = getUserForNode(startNode);
+const userReceptor = getUserForNode(targetNode);
+const result = dijkstra(graph, startNode);
+const totalDistance = result.distances[targetNode];
+console.log('Distancias:', result.distances);
+console.log('Caminos anteriores:', result.previous);
+console.log(`Distancia total desde ${startNode} hasta ${targetNode}:`, totalDistance);
+console.log(`Enviar mensaje a: ${userReceptor}`);
