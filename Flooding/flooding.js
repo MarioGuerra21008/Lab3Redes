@@ -45,4 +45,4 @@ nodeC.addNeighbor(nodeD);
 nodeD.addNeighbor(nodeC);
 
 // Iniciar la difusión
-nodeA.sendMessage('Hello', null);
+nodeA.sendMessage('Hello World', null);
