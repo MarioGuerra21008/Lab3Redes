@@ -1,12 +1,12 @@
 const graph = {
-    A: { D: 1, E: 2 },
-    B: { D: 2, F: 3, G: 1 },
-    C: { E: 3, G: 2 },
-    D: { A: 1, B: 2, G: 1 },
-    E: { A: 2, C: 3, F: 1 },
-    F: { B: 3, E: 1 },
-    G: { B: 1, C: 2, D: 1 }
-};
+    A: { D: 0, E: 0 },
+    B: { D: 0, F: 0, G: 0 },
+    C: { E: 0, G: 0 },
+    D: { A: 0, B: 0, G: 0 },
+    E: { A: 0, C: 0, F: 0 },
+    F: { B: 0, E: 0 },
+    G: { B: 0, C: 0, D: 0 }
+  };
 
 const names = {
     A: 'woot@alumchat.lol',
@@ -57,6 +57,34 @@ function dijkstra(graph, startNode) {
     return { distances, previous };
 };
 
+function getPath(previous, targetNode) {
+    const path = [];
+    let currentNode = targetNode;
+    while (currentNode) {
+        path.unshift(currentNode);
+        currentNode = previous[currentNode];
+    }
+    return path;
+};
+
+// Función para simular el tiempo de comunicación entre nodos
+function simulateCommunicationTime() {
+    // Simula tiempos aleatorios entre 1 y 10 ms
+    return Math.floor(Math.random() * 10) + 1;
+};
+
+// Actualizar pesos del grafo
+function updateGraphWeights(graph) {
+    for (let node in graph) {
+        for (let neighbor in graph[node]) {
+            graph[node][neighbor] = simulateCommunicationTime();
+        }
+    }
+};
+  
+// Ejecutar la actualización de pesos
+updateGraphWeights(graph);
+
 // Ejemplo de uso
 const startNode = 'A';
 const targetNode = 'C';
@@ -64,7 +92,10 @@ const userEmisor = getUserForNode(startNode);
 const userReceptor = getUserForNode(targetNode);
 const result = dijkstra(graph, startNode);
 const totalDistance = result.distances[targetNode];
+const path = getPath(result.previous, targetNode);
+console.log('Grafo:', graph)
+console.log(`Enviar mensaje a: ${userReceptor}`);
 console.log('Distancias:', result.distances);
 console.log('Caminos anteriores:', result.previous);
 console.log(`Distancia total desde ${startNode} hasta ${targetNode}:`, totalDistance);
-console.log(`Enviar mensaje a: ${userReceptor}`);
+console.log(`Camino desde ${startNode} hasta ${targetNode}:`, path.join(' -> '));
