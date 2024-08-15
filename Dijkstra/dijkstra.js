@@ -82,6 +82,17 @@ function updateGraphWeights(graph) {
     }
 };
   
+module.exports = {
+    graph,
+    names,
+    getUserForNode,
+    dijkstra,
+    getPath,
+    simulateCommunicationTime,
+    updateGraphWeights
+};
+
+
 // Ejecutar la actualización de pesos
 updateGraphWeights(graph);
 
@@ -93,7 +104,7 @@ const userReceptor = getUserForNode(targetNode);
 const result = dijkstra(graph, startNode);
 const totalDistance = result.distances[targetNode];
 const path = getPath(result.previous, targetNode);
-console.log('Grafo:', graph)
+console.log('Grafo (DIJSKTRA):', graph)
 console.log(`Enviar mensaje a: ${userReceptor}`);
 console.log('Distancias:', result.distances);
 console.log('Caminos anteriores:', result.previous);

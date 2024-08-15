@@ -1,38 +1,13 @@
-const graph = {
-    A: { D: 0, E: 0 },
-    B: { D: 0, F: 0, G: 0 },
-    C: { E: 0, G: 0 },
-    D: { A: 0, B: 0, G: 0 },
-    E: { A: 0, C: 0, F: 0 },
-    F: { B: 0, E: 0 },
-    G: { B: 0, C: 0, D: 0 }
-};
+const { 
+    graph, 
+    names, 
+    getUserForNode, 
+    dijkstra, 
+    getPath, 
+    simulateCommunicationTime, 
+    updateGraphWeights 
+} = require('../Dijkstra/dijkstra.js');
 
-const names = {
-    A: 'woot@alumchat.lol',
-    B: 'bar@alumchat.lol',
-    C: 'foo@alumchat.lol',
-    D: 'omg@alumchat.lol',
-    E: 'lol@alumchat.lol',
-    F: 'swag@alumchat.lol',
-    G: 'yeet@alumchat.lol'
-};
-
-function getUserForNode(node) {
-    return names[node];
-}
-
-function simulateCommunicationTime() {
-    return Math.floor(Math.random() * 10) + 1;
-}
-
-function updateGraphWeights(graph) {
-    for (let node in graph) {
-        for (let neighbor in graph[node]) {
-            graph[node][neighbor] = simulateCommunicationTime();
-        }
-    }
-}
 
 function floodLSA(graph) {
     const lsaDatabase = {};
@@ -43,44 +18,7 @@ function floodLSA(graph) {
 }
 
 function buildRoutingTable(graph, startNode, lsaDatabase) {
-    const distances = {};
-    const previous = {};
-    const nodes = new Set(Object.keys(graph));
-    
-    nodes.forEach(node => {
-        distances[node] = node === startNode ? 0 : Infinity;
-        previous[node] = null;
-    });
-    
-    while (nodes.size > 0) {
-        let closestNode = null;
-        nodes.forEach(node => {
-            if (!closestNode || distances[node] < distances[closestNode]) {
-                closestNode = node;
-            }
-        });
-        
-        nodes.delete(closestNode);
-        
-        for (let neighbor in lsaDatabase[closestNode]) {
-            const newDist = distances[closestNode] + lsaDatabase[closestNode][neighbor];
-            if (newDist < distances[neighbor]) {
-                distances[neighbor] = newDist;
-                previous[neighbor] = closestNode;
-            }
-        }
-    }
-    return { distances, previous };
-}
-
-function getPath(previous, targetNode) {
-    const path = [];
-    let currentNode = targetNode;
-    while (currentNode) {
-        path.unshift(currentNode);
-        currentNode = previous[currentNode];
-    }
-    return path;
+    return dijkstra(lsaDatabase, startNode);
 }
 
 function linkStateRouting(graph, startNode, targetNode) {
@@ -104,6 +42,15 @@ const targetNode = 'C';
 const userEmisor = getUserForNode(startNode);
 const userReceptor = getUserForNode(targetNode);
 const result = linkStateRouting(graph, startNode, targetNode);
+
+console.log('------------------------------------------------------------');
+console.log(`
+.____    .__        __       _________ __          __           __________               __  .__                
+|    |   |__| ____ |  | __  /   _____//  |______ _/  |_  ____   \______   \ ____  __ ___/  |_|__| ____    ____  
+|    |   |  |/    \|  |/ /  \_____  \\   __\__  \\   __\/ __ \   |       _//  _ \|  |  \   __\  |/    \  / ___\ 
+|    |___|  |   |  \    <   /        \|  |  / __ \|  | \  ___/   |    |   (  <_> )  |  /|  | |  |   |  \/ /_/  >
+|_______ \__|___|  /__|_ \ /_______  /|__| ____  /__|  \___  >  |____|_  /\____/|____/ |__| |__|___|  /\___  / 
+        \/       \/     \/         \/           \/          \/          \/                           \//_____/`);
 
 console.log('Grafo:', graph);
 console.log(`Enviar mensaje a: ${userReceptor}`);
