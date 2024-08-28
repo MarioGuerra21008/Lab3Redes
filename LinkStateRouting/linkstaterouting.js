@@ -39,6 +39,21 @@ async function login(username, password) {
     }
 }
 
+// Función para enviar un mensaje a un nodo y medir el tiempo de envío
+async function sendMessageAndMeasureTime(sender, recipient, message) {
+    const startTime = Date.now(); // Marca el tiempo inicial
+    const messageStanza = xml(
+        'message',
+        { to: `${recipient}@${domain}`, type: 'chat' },
+        xml('body', {}, message)
+    );
+    await xmpp.send(messageStanza); // Envía el mensaje
+    const endTime = Date.now(); // Marca el tiempo final
+    const timeTaken = endTime - startTime; // Calcula el tiempo total en ms
+    console.log(`Mensaje enviado de ${sender} a ${recipient} en ${timeTaken} ms.`);
+    return timeTaken;
+}
+
 function floodLSA(graph) {
     const lsaDatabase = {};
     for (let node in graph) {
