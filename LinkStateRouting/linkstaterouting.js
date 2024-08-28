@@ -7,7 +7,37 @@ const {
     simulateCommunicationTime, 
     updateGraphWeights 
 } = require('../Dijkstra/dijkstra.js');
+const { client, xml } = require("@xmpp/client");
 
+// Configuración del cliente XMPP
+const domain = "alumchat.lol";
+const service = "xmpp://alumchat.lol:5222";
+
+// Crear una instancia del cliente XMPP
+const xmpp = client({
+    service: service,
+    domain: domain,
+    username: null,
+    password: null,
+});
+
+xmpp.on("error", (err) => {
+    console.error("Error en la conexión XMPP:", err.message);
+});
+
+// Función para iniciar sesión en XMPP
+async function login(username, password) {
+    xmpp.options.username = username;
+    xmpp.options.password = password;
+    try {
+        await xmpp.start();
+        console.log("Conexión XMPP exitosa.");
+        // Enviar presencia de estado online
+        await xmpp.send(xml("presence"));
+    } catch (err) {
+        console.error("Error en login XMPP:", err.message);
+    }
+}
 
 function floodLSA(graph) {
     const lsaDatabase = {};
