@@ -54,7 +54,7 @@ async function main() {
         console.log('Mapeo de nodos a JIDs:', router.nodeToJID);
 
         // Enviar un mensaje de usuario
-        console.log('Enviando mensaje a alv21188-test2...');
+        console.log('Enviando mensaje...');
 
         // Conectar al servidor XMPP
         await router.connect();
@@ -71,7 +71,7 @@ async function main() {
         console.log('Tabla de pesos actualizada:', router.weightTable);
 
         // Enviar un mensaje de usuario
-        console.log('Enviando mensaje a alv21188-test2...');
+        console.log('Enviando mensaje...');
         router.sendUserMessage('alv21188-test2', 'Hola, este es un mensaje de prueba');
 
     } catch (err) {
