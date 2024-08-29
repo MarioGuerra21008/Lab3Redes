@@ -13,29 +13,48 @@ const { client, xml } = require("@xmpp/client");
 const domain = "alumchat.lol";
 const service = "xmpp://alumchat.lol:5222";
 
-// Crear una instancia del cliente XMPP
-const xmpp = client({
-    service: service,
-    domain: domain,
-    username: null,
-    password: null,
-});
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
-xmpp.on("error", (err) => {
-    console.error("Error en la conexión XMPP:", err.message);
-});
+let xmpp = null; // Variable para almacenar la instancia del cliente XMPP.
 
-// Función para iniciar sesión en XMPP
 async function login(username, password) {
-    xmpp.options.username = username;
-    xmpp.options.password = password;
+
+
+    xmpp = client({
+        service: service,
+        domain: domain,
+        username: username,
+        password: password,
+    });
+
+    
+    xmpp.on('online', (address) => {
+        console.log('Conexión XMPP exitosa como:', address.toString());
+    });
+
+
+    xmpp.on("error", (err) => {
+        console.error("Error en la conexión XMPP:", err.message);
+    });
+
+    xmpp.on('offline', () => {
+        console.log('Cliente XMPP desconectado.');
+    });
+
+    xmpp.on('disconnect', () => {
+        console.log('Desconectado. Intentando reconectar...');
+        xmpp.start().catch(err => console.error("Error al reconectar:", err.message));
+    });
+
+    
     try {
-        await xmpp.start();
-        console.log("Conexión XMPP exitosa.");
-        // Enviar presencia de estado online
-        await xmpp.send(xml("presence"));
+        await xmpp.start(); // Inicia la conexión con el servidor.
     } catch (err) {
-        console.error("Error en login XMPP:", err.message);
+        if (err.condition === "not-authorized") {
+            console.log("Credenciales incorrectas!");
+        } else {
+            console.log("Lo siento, hubo un problema: " + err.message);
+        }
     }
 }
 

@@ -5,8 +5,8 @@ const {
 
 
 async function main() {
-    const username = "tu_nombre_usuario";
-    const password = "tu_contraseña";
+    const username = "alv21188-gajim";
+    const password = "31dic2002";
 
     // Iniciar sesión
     await login(username, password);
@@ -19,7 +19,7 @@ async function main() {
     console.log('Resultado de enrutamiento:', result);
 
     // Enviar un mensaje y medir el tiempo
-    await sendMessageAndMeasureTime(username, 'otro_usuario', 'Hola, prueba de mensaje');
+    await sendMessageAndMeasureTime(username, 'alv21188-test2', 'Hola, prueba de mensaje');
 }
 
 main();
