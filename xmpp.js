@@ -1,22 +1,52 @@
 const XMPPLinkStateRouter = require('./XMPPLinkStateRouting.js');
+const fs = require('fs');
+
+
+// Función para leer la configuración de nombres desde el archivo
+function readConfigFile(filename) {
+    const data = fs.readFileSync(filename, 'utf8');
+    return JSON.parse(data);  // Convertir el contenido del archivo a un objeto JSON
+}
 
 async function main() {
-    const router = new XMPPLinkStateRouter('alv21188-gajim', '31dic2002');
-    await router.connect();
+    const router = new XMPPLinkStateRouter('alv21188-t1', '31dic2002');
+    try {
 
-    // Configurar vecinos (suponiendo que estos son tus vecinos directos)
-    router.neighbors = ['alv21188-test1', 'alv21188-test2', 'alv21188-test3'];
+        // Cargar solo los vecinos directos de este nodo
+        const topologyConfig = readConfigFile('topology.txt');
+        const namesConfig = readConfigFile('names.txt');
 
-    // Mapeo de nodos a JIDs (incluyendo tu propio nodo)
-    router.nodeToJID = {
-        'A': 'alv21188-gajim',  // Tu propio nodo
-        'B': 'alv21188-test1',
-        'C': 'alv21188-test2',  // El nodo al que quieres enviar el mensaje
-        'D': 'alv21188-test3'
-    };
+        // Determinar el nodo actual
+        const currentNode = 'A';  // Nodo actual donde se ejecuta este script
 
-    // Enviar un mensaje de usuario
-    router.sendUserMessage('alv21188-test2', 'Hola, este es un mensaje de prueba');
+        // Configurar vecinos solo según la información de vecinos directos
+        router.neighbors = topologyConfig.config[currentNode].map(node => namesConfig.config[node].split('@')[0]);
+
+        // Configurar el mapeo de nodos a JIDs (solo vecinos)
+        router.nodeToJID = topologyConfig.config[currentNode].reduce((map, node) => {
+            map[node] = namesConfig.config[node].split('@')[0];
+            return map;
+        }, { [currentNode]: namesConfig.config[currentNode].split('@')[0] });  // Incluir también el propio nodo
+
+        // Mapeo de JID a Nodo
+        router.jidToNode = Object.entries(router.nodeToJID).reduce((map, [node, jid]) => {
+            map[jid] = node;  // Mapeo inverso de nombre de usuario a nodo
+            return map;
+        }, {});
+
+        // Validar que los vecinos y el mapeo de nodos estén configurados correctamente
+        console.log('Vecinos configurados:', router.neighbors);
+        console.log('Mapeo de nodos a JIDs:', router.nodeToJID);
+
+        // Enviar un mensaje de usuario
+        console.log('Enviando mensaje a alv21188-test2...');
+
+        await router.connect();
+        //router.sendUserMessage('alv21188-test2', 'Hola, este es un mensaje de prueba');
+
+    } catch (err) {
+        console.error('Error al conectar o enviar el mensaje:', err);
+    }
 }
 
 main();

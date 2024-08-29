@@ -9,17 +9,14 @@ const {
 } = require('../Dijkstra/dijkstra.js');
 const { client, xml } = require("@xmpp/client");
 
-// Configuración del cliente XMPP
 const domain = "alumchat.lol";
 const service = "xmpp://alumchat.lol:5222";
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
-let xmpp = null; // Variable para almacenar la instancia del cliente XMPP.
+let xmpp = null;
 
 async function login(username, password) {
-
-
     xmpp = client({
         service: service,
         domain: domain,
@@ -27,11 +24,9 @@ async function login(username, password) {
         password: password,
     });
 
-    
     xmpp.on('online', (address) => {
         console.log('Conexión XMPP exitosa como:', address.toString());
     });
-
 
     xmpp.on("error", (err) => {
         console.error("Error en la conexión XMPP:", err.message);
@@ -46,9 +41,8 @@ async function login(username, password) {
         xmpp.start().catch(err => console.error("Error al reconectar:", err.message));
     });
 
-    
     try {
-        await xmpp.start(); // Inicia la conexión con el servidor.
+        await xmpp.start();
     } catch (err) {
         if (err.condition === "not-authorized") {
             console.log("Credenciales incorrectas!");
@@ -58,17 +52,16 @@ async function login(username, password) {
     }
 }
 
-// Función para enviar un mensaje a un nodo y medir el tiempo de envío
 async function sendMessageAndMeasureTime(sender, recipient, message) {
-    const startTime = Date.now(); // Marca el tiempo inicial
+    const startTime = Date.now();
     const messageStanza = xml(
         'message',
         { to: `${recipient}@${domain}`, type: 'chat' },
         xml('body', {}, message)
     );
-    await xmpp.send(messageStanza); // Envía el mensaje
-    const endTime = Date.now(); // Marca el tiempo final
-    const timeTaken = endTime - startTime; // Calcula el tiempo total en ms
+    await xmpp.send(messageStanza);
+    const endTime = Date.now();
+    const timeTaken = endTime - startTime;
     console.log(`Mensaje enviado de ${sender} a ${recipient} en ${timeTaken} ms.`);
     return timeTaken;
 }
@@ -86,11 +79,29 @@ function buildRoutingTable(graph, startNode, lsaDatabase) {
 }
 
 function linkStateRouting(graph, startNode, targetNode) {
+    if (!graph[startNode]) {
+        console.error(`Nodo de inicio ${startNode} no existe en el grafo.`);
+        return null;
+    }
+    
+    if (!graph[targetNode]) {
+        console.error(`Nodo de destino ${targetNode} no existe en el grafo.`);
+        return null;
+    }
+
     updateGraphWeights(graph);
     const lsaDatabase = floodLSA(graph);
     const routingTable = buildRoutingTable(graph, startNode, lsaDatabase);
+
+    if (!routingTable || !routingTable.distances[targetNode]) {
+        console.error(`No se pudo encontrar una ruta desde ${startNode} a ${targetNode}.`);
+        return null;
+    }
+
     const totalDistance = routingTable.distances[targetNode];
     const path = getPath(routingTable.previous, targetNode);
+
+    console.log(`Ruta calculada desde ${startNode} a ${targetNode}: ${path.join(' -> ')}`);
     
     return {
         distances: routingTable.distances,
@@ -99,7 +110,6 @@ function linkStateRouting(graph, startNode, targetNode) {
         path
     };
 }
-
 
 module.exports = {
     linkStateRouting,

@@ -11,10 +11,15 @@ class XMPPLinkStateRouter {
         this.username = username;
         this.password = password;
         this.xmpp = null;
-        this.neighbors = []; // Lista de vecinos
-        this.weightTable = {}; // Tabla de pesos
-        this.weightVersion = 0; // Versión de la tabla de pesos
-        this.nodeToJID = {}; // Mapeo de nodos (letras) a JIDs
+        this.neighbors = [];
+        this.weightTable = {};
+        this.weightVersion = 0;
+        this.nodeToJID = {};
+        this.jidToNode = {};
+        this.echoStartTimes = {};  // Para guardar los tiempos de inicio del eco
+        this.echoIterationLimit = 1;  // Límite de iteraciones de eco
+        this.currentEchoIteration = 0;  // Contador de iteraciones de eco
+        this.currentNeighbor = ""
     }
 
     async connect() {
@@ -27,12 +32,34 @@ class XMPPLinkStateRouter {
 
         this.xmpp.on('online', (address) => {
             console.log('Conexión XMPP exitosa como:', address.toString());
+
+            //console.log(this.nodeToJID)
+
+            // Ahora, configuras `jidToNode` al mismo tiempo
+            Object.entries(this.nodeToJID).forEach(([node, jid]) => {
+                this.jidToNode[jid] = node;
+            });
+
+            //console.log(this.jidToNode);
+    
+            // Enviar presencia para anunciar la conexión
+            this.xmpp.send(xml('presence'));
+    
             this.startEchoProcess();
         });
 
         this.xmpp.on("error", (err) => {
             console.error("Error en la conexión XMPP:", err.message);
         });
+
+        this.xmpp.on('offline', () => {
+            console.log('Cliente XMPP desconectado.');
+        });
+        
+        this.xmpp.on('disconnect', () => {
+            console.log('Desconectado. Intentando reconectar...');
+            this.xmpp.start().catch(err => console.error("Error al reconectar:", err.message));
+        });        
 
         this.xmpp.on('stanza', this.handleStanza.bind(this));
 
@@ -46,61 +73,122 @@ class XMPPLinkStateRouter {
     async sendMessage(to, body) {
         const message = xml(
             'message',
-            { to: `${to}@${domain}`, type: 'chat' },
-            xml('body', {}, JSON.stringify(body))
+            { 
+                to: `${to}@${domain}`,  // JID del destinatario
+                from: `${this.username}@${domain}`,  // JID del remitente
+                type: 'chat'  // Tipo de mensaje 'chat'
+            },
+            xml('body', {}, JSON.stringify(body))  // Cuerpo del mensaje como texto JSON
         );
-        await this.xmpp.send(message);
-    }
+    
+        //console.log('Stanza enviada:', message.toString());  // Imprimir la stanza completa como cadena
+        this.handleStanza(message);
+    
+        try {
+            await this.xmpp.send(message);  // Enviar el mensaje
+            //console.log(`Mensaje enviado a ${to}:`, body);  // Confirmación de envío de mensaje
+        } catch (error) {
+            console.error('Error al enviar el mensaje:', error);  // Manejo de errores
+        }
+    }    
+    
 
     handleStanza(stanza) {
+        //console.log("handleStanza recibida: ", stanza.toString());  // Imprimir la stanza completa como cadena
+    
+        // Manejar solo stanzas de tipo 'message' que tienen un 'body'
         if (stanza.is('message') && stanza.getChild('body')) {
+            //console.log("Dentro del if (stanza es 'message' con 'body')");
+    
             const from = stanza.attrs.from.split('@')[0];
-            const body = JSON.parse(stanza.getChildText('body'));
+            const bodyText = stanza.getChildText('body');
+    
+            // Validar que el texto del cuerpo sea JSON válido
+            try {
+                const body = JSON.parse(bodyText);
+    
+                console.log("body: ", body);
 
-            switch (body.type) {
-                case 'echo':
-                    this.handleEcho(from);
-                    break;
-                case 'echo_response':
-                    this.handleEchoResponse(from);
-                    break;
-                case 'weights':
-                    this.handleWeights(body);
-                    break;
-                case 'send_routing':
-                    this.handleSendRouting(body);
-                    break;
-                case 'message':
-                    this.handleUserMessage(body);
-                    break;
+                switch (body.type) {
+                    case 'echo':
+                        console.log("Mensaje 'echo' recibido de:", from);
+                        this.handleEcho(from);
+                        break;
+                    case 'echo_response':
+                        console.log("Mensaje 'echo_response' recibido de:", from);
+                        this.handleEchoResponse(from);
+                        break;
+                    case 'weights':
+                        this.handleWeights(body);
+                        break;
+                    case 'send_routing':
+                        this.handleSendRouting(body);
+                        break;
+                    case 'message':
+                        this.handleUserMessage(body);
+                        break;
+                    default:
+                        console.warn(`Tipo de mensaje no reconocido: ${body.type}`);
+                        break;
+                }
+            } catch (error) {
+                console.error('Error al parsear el body del mensaje como JSON:', error, 'Body:', bodyText);
             }
         }
     }
+    
 
     startEchoProcess() {
-        setInterval(() => {
+        const echoInterval = setInterval(() => {
+            if (this.currentEchoIteration >= this.echoIterationLimit) {
+                console.log('Límite de iteraciones de eco alcanzado. Deteniendo el proceso.');
+                clearInterval(echoInterval);
+                return;
+            }
+    
             this.neighbors.forEach(neighbor => {
+                //console.log(`Enviando mensaje de 'echo' a ${neighbor}`);  // Verificar el vecino antes de enviar
+                this.currentNeighbor = neighbor
+                this.echoStartTimes[neighbor] = Date.now();  // Guardar el tiempo de envío
+
+                //console.log("this.echoStartTimes[neighbor]: ", this.echoStartTimes[neighbor]);
                 this.sendMessage(neighbor, { type: 'echo' });
             });
-        }, 60000); // Cada minuto
+    
+            this.currentEchoIteration++;
+        }, 30000); // Cada 30 segundos
     }
+    
 
     handleEcho(from) {
+        console.log(`Echo recibido de ${from}, enviando echo_response.`);  // Debug
         this.sendMessage(from, { type: 'echo_response' });
     }
 
-    handleEchoResponse(from) {
-        // Aquí deberías implementar la lógica para medir el tiempo y actualizar los pesos
-        // Por simplicidad, usaremos un peso aleatorio entre 1 y 10
-        const weight = Math.random() * 9 + 1;
-        this.updateWeight(from, weight);
+    handleEchoResponse(fromJID) {
+        const endTime = Date.now();
+        const startTime = this.echoStartTimes[this.currentNeighbor];
+    
+        if (startTime !== undefined) {  // Verificar que el tiempo de inicio esté definido
+            const elapsed = (endTime - startTime) / 1000;  // Convertir a segundos
+            const node = this.jidToNode[this.currentNeighbor];  // Convertir JID a letra de nodo
+            console.log(`Tiempo transcurrido para el eco desde ${node}: ${elapsed} segundos`);
+            this.updateWeight(node, elapsed);  // Usar la letra del nodo en lugar del JID
+        } else {
+            console.error(`Tiempo de inicio no definido para ${fromJID}. No se puede calcular el tiempo de eco.`);
+        }
     }
-
+    
     updateWeight(node, weight) {
-        this.weightTable[node] = weight;
-        this.weightVersion++;
-        this.broadcastWeights();
-    }
+        if (!isNaN(weight)) {  // Verificar que el peso no sea NaN
+            this.weightTable[node] = weight;  // Guardar el peso directamente con la letra del nodo
+            this.weightVersion++;
+            console.log(`Tabla de pesos actualizada (versión ${this.weightVersion}):`, this.weightTable);  // Imprimir tabla de pesos
+            this.broadcastWeights();
+        } else {
+            console.error(`Peso no válido (NaN) para el nodo ${node}. No se actualiza la tabla de pesos.`);
+        }
+    }    
 
     broadcastWeights() {
         const weightMessage = {
@@ -109,6 +197,7 @@ class XMPPLinkStateRouter {
             version: this.weightVersion,
             from: this.username
         };
+        console.log(`Enviando tabla de pesos a los vecinos:`, weightMessage);  // Imprimir mensaje de pesos enviado
         this.neighbors.forEach(neighbor => {
             this.sendMessage(neighbor, weightMessage);
         });
@@ -116,36 +205,40 @@ class XMPPLinkStateRouter {
 
     handleWeights(body) {
         if (body.version > this.weightVersion) {
-            // Actualizar la tabla de pesos local
+            console.log(`Recibida nueva versión de tabla de pesos de ${body.from}:`, body.table);  // Imprimir tabla de pesos recibida
             Object.assign(this.weightTable, body.table);
             this.weightVersion = body.version;
 
-            // Reenviar a los vecinos
+            // Reenviar a los vecinos la nueva tabla de pesos
             this.neighbors.forEach(neighbor => {
                 if (neighbor !== body.from) {
                     this.sendMessage(neighbor, body);
                 }
             });
+        } else {
+            console.log(`Versión de tabla de pesos recibida de ${body.from} es obsoleta. No se reenvía.`);  // Mensaje de versión obsoleta
         }
     }
 
     handleSendRouting(body) {
         if (body.to === this.username) {
-            // El mensaje es para nosotros, convertirlo a un mensaje de usuario
             this.handleUserMessage({
                 type: 'message',
                 from: body.from,
                 data: body.data
             });
-        } else if (body.heap > 0) {
-            // Usar el algoritmo de enrutamiento para encontrar el siguiente salto
+        } else if (body.hops > 0) {
             const graph = this.buildGraphFromWeights();
             const result = linkStateRouting(graph, this.username, body.to);
-            const nextHop = result.path[1]; // El siguiente salto en la ruta
+            const nextHop = result.path[1];
 
-            // Enviar al siguiente salto
-            body.heap--;
+            body.hops--;  // Reducir el número de saltos restantes
+            console.log(`Reenviando mensaje de enrutamiento a ${nextHop}`);  // Mensaje de reenviando
+            console.log(this.nodeToJID);
             this.sendMessage(this.nodeToJID[nextHop], body);
+            
+        } else {
+            console.log(`Hops agotados para mensaje de enrutamiento de ${body.from} a ${body.to}`);  // Mensaje de hops agotados
         }
     }
 
@@ -154,16 +247,31 @@ class XMPPLinkStateRouter {
     }
 
     buildGraphFromWeights() {
-        // Construir el grafo a partir de la tabla de pesos
         const graph = {};
+    
+        console.log("WeightTable: ", this.weightTable);
+
+        // Agregar cada nodo y sus vecinos al grafo basado en weightTable
         for (const [node, weight] of Object.entries(this.weightTable)) {
-            graph[this.username] = graph[this.username] || {};
+            if (!graph[this.username]) {
+                graph[this.username] = {}; // Inicializa el nodo del usuario en el grafo
+            }
+    
+            // Agregar la conexión del nodo con su peso
             graph[this.username][node] = weight;
-            graph[node] = graph[node] || {};
+            
+            if (!graph[node]) {
+                graph[node] = {}; // Inicializa el nodo en el grafo si no existe
+            }
+    
+            // Asegurar que el grafo sea bidireccional (si 'A' tiene conexión con 'B', 'B' debe tener conexión con 'A')
             graph[node][this.username] = weight;
         }
+    
+        console.log('Grafo construido desde weightTable:', graph);  // Debug para mostrar el grafo construido
         return graph;
     }
+    
 
     sendUserMessage(to, message) {
         const routingMessage = {
@@ -173,13 +281,22 @@ class XMPPLinkStateRouter {
             data: message,
             hops: Object.keys(this.nodeToJID).length
         };
-        
-        const graph = this.buildGraphFromWeights();
-        const result = linkStateRouting(graph, this.username, to);
-        const nextHop = result.path[1]; // El siguiente salto en la ruta
 
-        this.sendMessage(this.nodeToJID[nextHop], routingMessage);
+        const graph = this.buildGraphFromWeights();
+
+        console.log("graph: ", graph);
+
+        const result = linkStateRouting(graph, this.username, to);
+
+        if (result && result.path.length > 1) {
+            const nextHop = result.path[1];
+            console.log(`Enviando mensaje de usuario a través de enrutamiento a ${nextHop}`);  // Mensaje de envío de usuario
+            this.sendMessage(this.nodeToJID[nextHop], routingMessage);
+        } else {
+            console.error(`No se pudo encontrar el siguiente salto para el mensaje de enrutamiento de ${this.username} a ${to}.`);
+        }
     }
+
 }
 
 module.exports = XMPPLinkStateRouter;
