@@ -41,8 +41,19 @@ async function main() {
         // Enviar un mensaje de usuario
         console.log('Enviando mensaje a alv21188-test2...');
 
+        // Conectar al servidor XMPP
         await router.connect();
-        //router.sendUserMessage('alv21188-test2', 'Hola, este es un mensaje de prueba');
+
+        // Esperar hasta que se actualice la tabla de pesos
+        console.log('Esperando a que se complete el proceso de eco y se actualice la tabla de pesos...');
+        await new Promise(resolve => setTimeout(resolve, 35000));  // Esperar más tiempo si es necesario
+
+        // Validar que la tabla de pesos está actualizada
+        console.log('Tabla de pesos actualizada:', router.weightTable);
+
+        // Enviar un mensaje de usuario
+        console.log('Enviando mensaje a alv21188-test2...');
+        router.sendUserMessage('alv21188-test2', 'Hola, este es un mensaje de prueba');
 
     } catch (err) {
         console.error('Error al conectar o enviar el mensaje:', err);

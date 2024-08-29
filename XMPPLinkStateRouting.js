@@ -10,6 +10,7 @@ class XMPPLinkStateRouter {
     constructor(username, password) {
         this.username = username;
         this.password = password;
+        this.to = "";
         this.xmpp = null;
         this.neighbors = [];
         this.weightTable = {};
@@ -20,6 +21,7 @@ class XMPPLinkStateRouter {
         this.echoIterationLimit = 1;  // Límite de iteraciones de eco
         this.currentEchoIteration = 0;  // Contador de iteraciones de eco
         this.currentNeighbor = ""
+        this.currentNode = "A"
     }
 
     async connect() {
@@ -122,6 +124,7 @@ class XMPPLinkStateRouter {
                         this.handleWeights(body);
                         break;
                     case 'send_routing':
+                        //console.log("body routing: ", body);
                         this.handleSendRouting(body);
                         break;
                     case 'message':
@@ -156,7 +159,7 @@ class XMPPLinkStateRouter {
             });
     
             this.currentEchoIteration++;
-        }, 30000); // Cada 30 segundos
+        }, 10000); // Cada 30 segundos
     }
     
 
@@ -221,7 +224,10 @@ class XMPPLinkStateRouter {
     }
 
     handleSendRouting(body) {
-        if (body.to === this.username) {
+
+        console.log("this.currentNode: ",this.currentNode);
+
+        if (body.to === this.currentNode) {
             this.handleUserMessage({
                 type: 'message',
                 from: body.from,
@@ -229,7 +235,9 @@ class XMPPLinkStateRouter {
             });
         } else if (body.hops > 0) {
             const graph = this.buildGraphFromWeights();
-            const result = linkStateRouting(graph, this.username, body.to);
+            //console.log("SENDROUTING: ",body.to);
+            //console.log("SENDROUTING2: ",this.jidToNode[body.to]);
+            const result = linkStateRouting(graph, this.jidToNode[this.username], body.to);
             const nextHop = result.path[1];
 
             body.hops--;  // Reducir el número de saltos restantes
@@ -253,19 +261,19 @@ class XMPPLinkStateRouter {
 
         // Agregar cada nodo y sus vecinos al grafo basado en weightTable
         for (const [node, weight] of Object.entries(this.weightTable)) {
-            if (!graph[this.username]) {
-                graph[this.username] = {}; // Inicializa el nodo del usuario en el grafo
+            if (!graph[this.jidToNode[this.username]]) {
+                graph[this.jidToNode[this.username]] = {}; // Inicializa el nodo del usuario en el grafo
             }
     
             // Agregar la conexión del nodo con su peso
-            graph[this.username][node] = weight;
+            graph[this.jidToNode[this.username]][node] = weight;
             
             if (!graph[node]) {
                 graph[node] = {}; // Inicializa el nodo en el grafo si no existe
             }
     
             // Asegurar que el grafo sea bidireccional (si 'A' tiene conexión con 'B', 'B' debe tener conexión con 'A')
-            graph[node][this.username] = weight;
+            graph[node][this.jidToNode[this.username]] = weight;
         }
     
         console.log('Grafo construido desde weightTable:', graph);  // Debug para mostrar el grafo construido
@@ -274,10 +282,15 @@ class XMPPLinkStateRouter {
     
 
     sendUserMessage(to, message) {
+
+        console.log("to: ", this.jidToNode[to])
+        console.log("from: ",this.jidToNode[this.username])
+
+
         const routingMessage = {
             type: 'send_routing',
-            to: to,
-            from: this.username,
+            to: this.jidToNode[to],
+            from: this.jidToNode[this.username],
             data: message,
             hops: Object.keys(this.nodeToJID).length
         };
@@ -286,11 +299,12 @@ class XMPPLinkStateRouter {
 
         console.log("graph: ", graph);
 
-        const result = linkStateRouting(graph, this.username, to);
+        const result = linkStateRouting(graph, this.jidToNode[this.username], this.jidToNode[to]);
 
         if (result && result.path.length > 1) {
             const nextHop = result.path[1];
             console.log(`Enviando mensaje de usuario a través de enrutamiento a ${nextHop}`);  // Mensaje de envío de usuario
+            this.currentNode = nextHop
             this.sendMessage(this.nodeToJID[nextHop], routingMessage);
         } else {
             console.error(`No se pudo encontrar el siguiente salto para el mensaje de enrutamiento de ${this.username} a ${to}.`);
