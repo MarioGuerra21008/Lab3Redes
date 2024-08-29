@@ -81,12 +81,31 @@ function linkStateRouting(graph, startNode, targetNode) {
     };
 }
 
+
+module.exports = {
+    linkStateRouting,
+    login,
+    sendMessageAndMeasureTime
+};
+
 // Ejemplo de uso
+
+/*
 const startNode = 'A';
 const targetNode = 'C';
 const userEmisor = getUserForNode(startNode);
 const userReceptor = getUserForNode(targetNode);
 const result = linkStateRouting(graph, startNode, targetNode);
+
+console.log('Grafo:', graph);
+console.log(`Enviar mensaje a: ${userReceptor}`);
+console.log('Distancias:', result.distances);
+console.log('Caminos anteriores:', result.previous);
+console.log(`Distancia total desde ${startNode} hasta ${targetNode}:`, result.totalDistance);
+console.log(`Camino desde ${startNode} hasta ${targetNode}:`, result.path.join(' -> '));
+
+
+*/
 
 console.log('------------------------------------------------------------');
 console.log(`
@@ -97,9 +116,3 @@ console.log(`
 |_______ \__|___|  /__|_ \ /_______  /|__| ____  /__|  \___  >  |____|_  /\____/|____/ |__| |__|___|  /\___  / 
         \/       \/     \/         \/           \/          \/          \/                           \//_____/`);
 
-console.log('Grafo:', graph);
-console.log(`Enviar mensaje a: ${userReceptor}`);
-console.log('Distancias:', result.distances);
-console.log('Caminos anteriores:', result.previous);
-console.log(`Distancia total desde ${startNode} hasta ${targetNode}:`, result.totalDistance);
-console.log(`Camino desde ${startNode} hasta ${targetNode}:`, result.path.join(' -> '));
