@@ -28,21 +28,4 @@ class Node {
     }
 }
 
-// Ejemplo de uso:
-
-// Crear nodos
-const nodeA = new Node('A');
-const nodeB = new Node('B');
-const nodeC = new Node('C');
-const nodeD = new Node('D');
-
-// Conectar los nodos
-nodeA.addNeighbor(nodeB);
-nodeB.addNeighbor(nodeA);
-nodeB.addNeighbor(nodeC);
-nodeC.addNeighbor(nodeB);
-nodeC.addNeighbor(nodeD);
-nodeD.addNeighbor(nodeC);
-
-// Iniciar la difusión
-nodeA.sendMessage('Hello World', null);
+module.exports = Node;

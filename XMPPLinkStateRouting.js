@@ -1,5 +1,6 @@
 const { client, xml } = require("@xmpp/client");
 const { linkStateRouting } = require('./LinkStateRouting/linkstaterouting.js');
+const Node = require('./Flooding/flooding.js');
 
 const domain = "alumchat.lol";
 const service = "xmpp://alumchat.lol:5222";
@@ -22,6 +23,8 @@ class XMPPLinkStateRouter {
         this.currentEchoIteration = 0;  // Contador de iteraciones de eco
         this.currentNeighbor = ""
         this.currentNode = "A"
+        this.floodingNodes = {};  // Para almacenar los nodos en el algoritmo de Flooding
+
     }
 
     async connect() {
@@ -40,6 +43,16 @@ class XMPPLinkStateRouter {
             // Ahora, configuras `jidToNode` al mismo tiempo
             Object.entries(this.nodeToJID).forEach(([node, jid]) => {
                 this.jidToNode[jid] = node;
+                this.floodingNodes[node] = new Node(node);
+            });
+
+            Object.keys(this.floodingNodes).forEach(node => {
+                // Conectar los nodos de Flooding
+                const currentNode = this.floodingNodes[node];
+                const neighbors = this.neighbors.filter(neighbor => neighbor !== node);  // Todos los vecinos excepto el actual
+                neighbors.forEach(neighbor => {
+                    currentNode.addNeighbor(this.floodingNodes[neighbor]);
+                });
             });
 
             //console.log(this.jidToNode);
@@ -129,6 +142,9 @@ class XMPPLinkStateRouter {
                         break;
                     case 'message':
                         this.handleUserMessage(body);
+                        break;
+                    case 'flooding':
+                        this.handleFloodingMessage(body);  // Manejar mensajes de Flooding
                         break;
                     default:
                         console.warn(`Tipo de mensaje no reconocido: ${body.type}`);
@@ -309,6 +325,29 @@ class XMPPLinkStateRouter {
         } else {
             console.error(`No se pudo encontrar el siguiente salto para el mensaje de enrutamiento de ${this.username} a ${to}.`);
         }
+    }
+
+
+    handleFloodingMessage(body) {
+        if (body.from !== this.username) {
+            console.log(`Mensaje de flooding recibido de ${body.from}: ${body.data}`);
+            this.neighbors.forEach(neighbor => {
+                if (neighbor !== body.from) {
+                    this.sendMessage(neighbor, body);
+                }
+            });
+        }
+    }
+
+    startFlooding(message) {
+        const floodingMessage = {
+            type: 'flooding',
+            from: this.username,
+            data: message
+        };
+        this.neighbors.forEach(neighbor => {
+            this.sendMessage(neighbor, floodingMessage);
+        });
     }
 
 }

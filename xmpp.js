@@ -1,6 +1,6 @@
 const XMPPLinkStateRouter = require('./XMPPLinkStateRouting.js');
 const fs = require('fs');
-
+const Node = require('./Flooding/flooding.js');  // Importar la clase Node para Flooding
 
 // Función para leer la configuración de nombres desde el archivo
 function readConfigFile(filename) {
@@ -34,6 +34,21 @@ async function main() {
             return map;
         }, {});
 
+
+        // Inicializar los nodos de Flooding
+        router.floodingNodes = {};
+        router.neighbors.forEach(neighbor => {
+            router.floodingNodes[neighbor] = new Node(neighbor);  // Crear instancia de Node para cada vecino
+        });
+        router.floodingNodes[currentNode] = new Node(currentNode);  // Crear nodo para el nodo actual
+
+        // Conectar los nodos de Flooding
+        router.neighbors.forEach(neighbor => {
+            router.floodingNodes[currentNode].addNeighbor(router.floodingNodes[neighbor]);
+            router.floodingNodes[neighbor].addNeighbor(router.floodingNodes[currentNode]);
+        });
+
+
         // Validar que los vecinos y el mapeo de nodos estén configurados correctamente
         console.log('Vecinos configurados:', router.neighbors);
         console.log('Mapeo de nodos a JIDs:', router.nodeToJID);
@@ -47,6 +62,10 @@ async function main() {
         // Esperar hasta que se actualice la tabla de pesos
         console.log('Esperando a que se complete el proceso de eco y se actualice la tabla de pesos...');
         await new Promise(resolve => setTimeout(resolve, 35000));  // Esperar más tiempo si es necesario
+
+        // Iniciar el proceso de Flooding
+        console.log('Iniciando el proceso de Flooding...');
+        router.startFlooding('Mensaje de prueba de Flooding');  // Enviar un mensaje de prueba usando Flooding
 
         // Validar que la tabla de pesos está actualizada
         console.log('Tabla de pesos actualizada:', router.weightTable);
