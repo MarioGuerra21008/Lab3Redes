@@ -21,9 +21,11 @@ class XMPPLinkStateRouter {
         this.echoStartTimes = {};  // Para guardar los tiempos de inicio del eco
         this.echoIterationLimit = 1;  // Límite de iteraciones de eco
         this.currentEchoIteration = 0;  // Contador de iteraciones de eco
-        this.currentNeighbor = ""
-        this.currentNode = "A"
+        this.currentNeighbor = "";
+        this.currentNode = "";
         this.floodingNodes = {};  // Para almacenar los nodos en el algoritmo de Flooding
+        this.topologyConfig = {};
+        this.namesConfig = {};
 
     }
 
@@ -240,9 +242,8 @@ class XMPPLinkStateRouter {
     }
 
     handleSendRouting(body) {
-
-        console.log("this.currentNode: ",this.currentNode);
-
+        console.log("this.currentNode: ", this.currentNode);
+    
         if (body.to === this.currentNode) {
             this.handleUserMessage({
                 type: 'message',
@@ -251,20 +252,27 @@ class XMPPLinkStateRouter {
             });
         } else if (body.hops > 0) {
             const graph = this.buildGraphFromWeights();
-            //console.log("SENDROUTING: ",body.to);
-            //console.log("SENDROUTING2: ",this.jidToNode[body.to]);
-            const result = linkStateRouting(graph, this.jidToNode[this.username], body.to);
-            const nextHop = result.path[1];
-
-            body.hops--;  // Reducir el número de saltos restantes
-            console.log(`Reenviando mensaje de enrutamiento a ${nextHop}`);  // Mensaje de reenviando
-            console.log(this.nodeToJID);
-            this.sendMessage(this.nodeToJID[nextHop], body);
-            
+            const result = linkStateRouting(graph, this.currentNode, body.to);
+    
+            if (result && result.path.length > 1) {
+                const nextHop = result.path[1];
+    
+                // Verificar si el siguiente salto es diferente del nodo actual
+                if (nextHop !== this.currentNode) {
+                    body.hops--;
+                    console.log(`Reenviando mensaje de enrutamiento a ${nextHop}`);  // Mensaje de reenviando
+                    this.sendMessage(this.nodeToJID[nextHop], body);
+                } else {
+                    console.error(`El siguiente salto calculado es el nodo actual (${this.currentNode}). Recalcular ruta o detener.`);
+                }
+            } else {
+                console.error(`No se pudo encontrar el siguiente salto para el mensaje de enrutamiento de ${body.from} a ${body.to}.`);
+            }
         } else {
             console.log(`Hops agotados para mensaje de enrutamiento de ${body.from} a ${body.to}`);  // Mensaje de hops agotados
         }
     }
+    
 
     handleUserMessage(body) {
         console.log(`Mensaje recibido de ${body.from}: ${body.data}`);
@@ -274,27 +282,49 @@ class XMPPLinkStateRouter {
         const graph = {};
     
         console.log("WeightTable: ", this.weightTable);
-
+    
+        // Inicializar el grafo con todos los nodos y sus conexiones basadas en la topología
+        Object.keys(this.nodeToJID).forEach(nodeKey => {
+            const node = nodeKey;  // Usar directamente el identificador del nodo
+            if (!graph[node]) {
+                graph[node] = {};
+            }
+    
+            // Obtener vecinos de la topología para el nodo actual
+            const topologyNeighbors = this.topologyConfig.config[node] || [];  // Asegurar que accedemos a 'config'
+            topologyNeighbors.forEach(neighborKey => {
+                if (!graph[neighborKey]) {
+                    graph[neighborKey] = {};  // Inicializar el nodo vecino si no existe
+                }
+                if (!graph[node][neighborKey]) {
+                    graph[node][neighborKey] = 1; // Conexión directa predeterminada con peso 1
+                }
+                //if (!graph[neighborKey][node]) {
+                //    graph[neighborKey][node] = 1; // Hacer la conexión bidireccional
+                //}
+            });
+        });
+    
         // Agregar cada nodo y sus vecinos al grafo basado en weightTable
         for (const [node, weight] of Object.entries(this.weightTable)) {
-            if (!graph[this.jidToNode[this.username]]) {
-                graph[this.jidToNode[this.username]] = {}; // Inicializa el nodo del usuario en el grafo
+            if (!graph[this.currentNode]) {
+                graph[this.currentNode] = {}; // Inicializa el nodo del usuario en el grafo
             }
     
             // Agregar la conexión del nodo con su peso
-            graph[this.jidToNode[this.username]][node] = weight;
-            
+            graph[this.currentNode][node] = weight;
             if (!graph[node]) {
                 graph[node] = {}; // Inicializa el nodo en el grafo si no existe
             }
     
             // Asegurar que el grafo sea bidireccional (si 'A' tiene conexión con 'B', 'B' debe tener conexión con 'A')
-            graph[node][this.jidToNode[this.username]] = weight;
+            graph[node][this.currentNode] = weight;
         }
     
-        console.log('Grafo construido desde weightTable:', graph);  // Debug para mostrar el grafo construido
+        console.log('Grafo construido desde weightTable y topología:', graph);
         return graph;
     }
+    
     
 
     sendUserMessage(to, message) {

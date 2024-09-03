@@ -30,6 +30,8 @@ async function main() {
 
             const router = new XMPPLinkStateRouter(username, password);
             router.currentNode = node;
+            router.topologyConfig = topologyConfig;
+            router.namesConfig = namesConfig;
             router.neighbors = topologyConfig.config[node].map(neighbor => namesConfig.config[neighbor].split('@')[0]);
             router.nodeToJID = Object.keys(namesConfig.config).reduce((map, key) => {
                 map[key] = namesConfig.config[key].split('@')[0];
