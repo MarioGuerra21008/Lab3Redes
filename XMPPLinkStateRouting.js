@@ -87,16 +87,18 @@ class XMPPLinkStateRouter {
         }
     }
 
-    async sendMessage(to, body) {
+    async sendMessage(to, body, useCurrentNodeAsFrom = false) {
+        const fromNode = useCurrentNodeAsFrom ? this.nodeToJID[this.currentNode] : this.username;
         const message = xml(
             'message',
             { 
                 to: `${to}@${domain}`,  // JID del destinatario
-                from: `${this.username}@${domain}`,  // JID del remitente
+                from: `${fromNode}@${domain}`,  // JID del remitente
                 type: 'chat'  // Tipo de mensaje 'chat'
             },
             xml('body', {}, JSON.stringify(body))  // Cuerpo del mensaje como texto JSON
         );
+        console.log("From message: ", fromNode);
     
         //console.log('Stanza enviada:', message.toString());  // Imprimir la stanza completa como cadena
         this.handleStanza(message);
@@ -250,18 +252,20 @@ class XMPPLinkStateRouter {
                 from: body.from,
                 data: body.data
             });
+            this.currentNode = this.jidToNode[this.username];
         } else if (body.hops > 0) {
             const graph = this.buildGraphFromWeights();
             const result = linkStateRouting(graph, this.currentNode, body.to);
     
             if (result && result.path.length > 1) {
                 const nextHop = result.path[1];
-    
+                console.log("Este es el nextHop: ", nextHop);
                 // Verificar si el siguiente salto es diferente del nodo actual
                 if (nextHop !== this.currentNode) {
                     body.hops--;
                     console.log(`Reenviando mensaje de enrutamiento a ${nextHop}`);  // Mensaje de reenviando
-                    this.sendMessage(this.nodeToJID[nextHop], body);
+                    console.log("El usuario en cuestión es: ", this.nodeToJID[nextHop]);
+                    this.sendMessage(this.nodeToJID[nextHop], body, true);
                 } else {
                     console.error(`El siguiente salto calculado es el nodo actual (${this.currentNode}). Recalcular ruta o detener.`);
                 }
@@ -270,10 +274,10 @@ class XMPPLinkStateRouter {
             }
         } else {
             console.log(`Hops agotados para mensaje de enrutamiento de ${body.from} a ${body.to}`);  // Mensaje de hops agotados
+            this.currentNode = this.jidToNode[this.username];  // Restaurar currentNode al nodo del usuario logueado
         }
     }
     
-
     handleUserMessage(body) {
         console.log(`Mensaje recibido de ${body.from}: ${body.data}`);
     }
@@ -345,13 +349,14 @@ class XMPPLinkStateRouter {
 
         console.log("graph: ", graph);
 
-        const result = linkStateRouting(graph, this.jidToNode[this.username], this.jidToNode[to]);
+        const result = linkStateRouting(graph, this.currentNode, this.jidToNode[to]);
 
         if (result && result.path.length > 1) {
             const nextHop = result.path[1];
             console.log(`Enviando mensaje de usuario a través de enrutamiento a ${nextHop}`);  // Mensaje de envío de usuario
-            this.currentNode = nextHop
-            this.sendMessage(this.nodeToJID[nextHop], routingMessage);
+            this.currentNode = nextHop;
+            console.log("El usuario en cuestión es parte 2: ", this.nodeToJID[nextHop]);
+            this.sendMessage(this.nodeToJID[nextHop], routingMessage, true);
         } else {
             console.error(`No se pudo encontrar el siguiente salto para el mensaje de enrutamiento de ${this.username} a ${to}.`);
         }
