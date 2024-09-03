@@ -1,6 +1,7 @@
 const XMPPLinkStateRouter = require('./XMPPLinkStateRouting.js');
 const fs = require('fs');
 const Node = require('./Flooding/flooding.js');  // Importar la clase Node para Flooding
+const readline = require('readline')
 
 // Función para leer la configuración de nombres desde el archivo
 function readConfigFile(filename) {
@@ -9,74 +10,61 @@ function readConfigFile(filename) {
 }
 
 async function main() {
-    const router = new XMPPLinkStateRouter('alv21188-t1', '31dic2002');
-    try {
+    const topologyConfig = readConfigFile('topology.txt');
+    const namesConfig = readConfigFile('names.txt');
 
-        // Cargar solo los vecinos directos de este nodo
-        const topologyConfig = readConfigFile('topology.txt');
-        const namesConfig = readConfigFile('names.txt');
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+    });
 
-        // Determinar el nodo actual
-        const currentNode = 'A';  // Nodo actual donde se ejecuta este script
+    rl.question('Usuario: ', (username) => {
+        rl.question('Contraseña: ', async (password) => {
+            const node = Object.keys(namesConfig.config).find(key => namesConfig.config[key].startsWith(username));
 
-        // Configurar vecinos solo según la información de vecinos directos
-        router.neighbors = topologyConfig.config[currentNode].map(node => namesConfig.config[node].split('@')[0]);
+            if (!node || !topologyConfig.config[node]) {
+                console.error('Usuario no encontrado en la topología.');
+                rl.close();
+                return;
+            }
 
-        // Configurar el mapeo de nodos a JIDs (solo vecinos)
-        router.nodeToJID = topologyConfig.config[currentNode].reduce((map, node) => {
-            map[node] = namesConfig.config[node].split('@')[0];
-            return map;
-        }, { [currentNode]: namesConfig.config[currentNode].split('@')[0] });  // Incluir también el propio nodo
+            const router = new XMPPLinkStateRouter(username, password);
+            router.currentNode = node;
+            router.neighbors = topologyConfig.config[node].map(neighbor => namesConfig.config[neighbor].split('@')[0]);
+            router.nodeToJID = Object.keys(namesConfig.config).reduce((map, key) => {
+                map[key] = namesConfig.config[key].split('@')[0];
+                return map;
+            }, {});
+            router.jidToNode = Object.entries(router.nodeToJID).reduce((map, [key, jid]) => {
+                map[jid] = key;
+                return map;
+            }, {});
 
-        // Mapeo de JID a Nodo
-        router.jidToNode = Object.entries(router.nodeToJID).reduce((map, [node, jid]) => {
-            map[jid] = node;  // Mapeo inverso de nombre de usuario a nodo
-            return map;
-        }, {});
+            try {
+                await router.connect();
+                console.log('Conectado y listo para enviar mensajes.');
 
+                rl.on('line', (input) => {
+                    if (input.trim().toLowerCase() === 'exit') {
+                        console.log('Cerrando programa...');
+                        rl.close();
+                        process.exit(0);
+                    }
 
-        // Inicializar los nodos de Flooding
-        router.floodingNodes = {};
-        router.neighbors.forEach(neighbor => {
-            router.floodingNodes[neighbor] = new Node(neighbor);  // Crear instancia de Node para cada vecino
+                    const [to, ...messageParts] = input.split(' ');
+                    const message = messageParts.join(' ');
+                    if (to && message) {
+                        router.sendUserMessage(to, message);
+                    } else {
+                        console.log('Uso: <destinatario> <mensaje>');
+                    }
+                });
+
+            } catch (err) {
+                console.error('Error al conectar o enviar el mensaje:', err);
+            }
         });
-        router.floodingNodes[currentNode] = new Node(currentNode);  // Crear nodo para el nodo actual
-
-        // Conectar los nodos de Flooding
-        router.neighbors.forEach(neighbor => {
-            router.floodingNodes[currentNode].addNeighbor(router.floodingNodes[neighbor]);
-            router.floodingNodes[neighbor].addNeighbor(router.floodingNodes[currentNode]);
-        });
-
-
-        // Validar que los vecinos y el mapeo de nodos estén configurados correctamente
-        console.log('Vecinos configurados:', router.neighbors);
-        console.log('Mapeo de nodos a JIDs:', router.nodeToJID);
-
-        // Enviar un mensaje de usuario
-        console.log('Enviando mensaje...');
-
-        // Conectar al servidor XMPP
-        await router.connect();
-
-        // Esperar hasta que se actualice la tabla de pesos
-        console.log('Esperando a que se complete el proceso de eco y se actualice la tabla de pesos...');
-        await new Promise(resolve => setTimeout(resolve, 35000));  // Esperar más tiempo si es necesario
-
-        // Iniciar el proceso de Flooding
-        console.log('Iniciando el proceso de Flooding...');
-        router.startFlooding('Mensaje de prueba de Flooding');  // Enviar un mensaje de prueba usando Flooding
-
-        // Validar que la tabla de pesos está actualizada
-        console.log('Tabla de pesos actualizada:', router.weightTable);
-
-        // Enviar un mensaje de usuario
-        console.log('Enviando mensaje...');
-        router.sendUserMessage('alv21188-test2', 'Hola, este es un mensaje de prueba');
-
-    } catch (err) {
-        console.error('Error al conectar o enviar el mensaje:', err);
-    }
+    });
 }
 
 main();
