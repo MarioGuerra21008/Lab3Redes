@@ -179,7 +179,7 @@ class XMPPLinkStateRouter {
             });
     
             this.currentEchoIteration++;
-        }, 10000); // Cada 30 segundos
+        }, 1000); // Un segundo de delay.
     }
     
 
