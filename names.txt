@@ -1,9 +1,1 @@
-{
-    "type": "names",
-        "config": {
-        "A": "gue21008-gajim2@alumchat.lol",
-        "B": "gue21008test1@alumchat.lol",
-        "C": "gue21008test4@alumchat.lol",
-        "D": "gue21008-test3@alumchat.lol"
-    }
-}
+{"type":"names", "config":{"A": "ara21053@alumchat.lol", "B": "ara21053test@alumchat.lol", "C": "gue21008@alumchat.lol", "D": "alv21188@alumchat.lol"} }
